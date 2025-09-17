@@ -1,0 +1,27 @@
+@import "tailwindcss/base";
+@import "tailwindcss/components";
+@import "tailwindcss/utilities";
+
+body {
+  margin: 0;
+  padding: 0;
+}
+
+.layout {
+  width: 375px;
+  background-color: #ffffff; /* bg-white */
+  /* padding: 20px; p-5 */
+  height: 600px;
+  font-family: "Barlow", sans-serif;
+}
+
+.react-international-phone-country-selector-button{
+  border: none !important ;
+}
+.react-international-phone-country-selector-button:hover {
+  background-color: #ffffff !important ;
+}
+
+.react-international-phone-country-selector{
+  display: none;
+}

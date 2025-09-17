@@ -1,0 +1,1417 @@
+openapi: 3.0.0
+# 
+# Senda Services API - Chrome Extension Integration
+# Development Status: Updated for current EqualsMoney integration
+# 
+# Available Development Endpoints:
+# - GET  /api/eqm/currencies  (Static data, no auth required)
+# - GET  /api/eqm/accounts    (EqualsMoney account management)
+# - POST /api/eqm/onboard-account (Account registration)
+# - GET  /company/data        (Public Companies House API)
+#
+# Development Server: http://localhost:3001
+# Swagger Docs: http://localhost:3001/api/docs
+#
+info:
+  title: Senda User Registration API
+  description: |
+    API endpoints for user registration, login, and account verification - optimized for Chrome Extension integration.
+    
+    **Development Mode Features:**
+    - Currency endpoint returns static data (no authentication required)
+    - EqualsMoney integration with mock responses for development
+    - Companies House API integration for real company data
+    
+    **Current Development Status:**
+    - Server running on port 3001
+    - Static currency list available at /api/eqm/currencies
+    - Public company data endpoint at /company/data
+  version: '1.0'
+  contact:
+    name: Senda Services API
+    email: support@senda.com
+
+servers:
+  - url: http://localhost:3001
+    description: Local development server
+  - url: http://localhost:3000
+    description: Alternative local development server
+  - url: https://api.senda.com
+    description: Production server
+
+security:
+  - bearerAuth: []
+
+tags:
+  - name: Company Registration
+    description: Register new companies with admin users
+  - name: Team Member Registration
+    description: Register team members via invitations
+  - name: EqualsMoney Integration
+    description: |
+      EqualsMoney API integration for financial services.
+      **Development Mode**: Currency endpoint provides static data without authentication.
+  - name: Company Information
+    description: Retrieve company data from Companies House API (Public endpoints)
+  - name: Authentication
+    description: User and admin login endpoints
+  - name: Verification
+    description: Email and phone verification with OTP
+  - name: User Profile
+    description: User profile management
+
+paths:
+  /auth/register/company:
+
+    post:
+      tags:
+        - Company Registration
+      operationId: registerCompany
+      summary: Register a new company with CEO/admin user
+      description: |
+        Register a new company along with the first admin user. This creates:
+        - A new company record
+        - An admin user account for the company
+        - Sends email and SMS verification codes
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterCompanyDto'
+            example:
+              companyNumber: "123456789"
+              companyName: "Tech Solutions Ltd"
+              address: "123 Business Street, London, UK"
+              directors: ["John Doe", "Jane Smith"]
+              adminName: "John Doe"
+              adminEmail: "john.doe@techsolutions.com"
+              adminPhone: "+447123456789"
+              adminPassword: "SecurePassword123!"
+      responses:
+        '201':
+          description: Company registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationResponseDto'
+              example:
+                success: true
+                message: "Company registered successfully. Please verify your email and phone."
+                userId: "550e8400-e29b-41d4-a716-446655440000"
+                companyId: "550e8400-e29b-41d4-a716-446655440001"
+        '400':
+          description: Bad request - validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 400
+                message: ["Password must be at least 8 characters long"]
+                error: "Bad Request"
+        '409':
+          description: Company or email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 409
+                message: "Company with this registration number already exists"
+                error: "Conflict"
+
+  /auth/register/team-member:
+    post:
+      tags:
+        - Team Member Registration
+      operationId: registerTeamMember
+      summary: Register a new team member via invitation
+      description: |
+        Register a team member using an invitation token. The invitation must be valid and not expired.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterTeamMemberDto'
+            example:
+              name: "Jane Smith"
+              email: "jane.smith@techsolutions.com"
+              phone: "+447123456790"
+              password: "SecurePassword123!"
+              invitationToken: "inv_550e8400-e29b-41d4-a716-446655440000"
+      responses:
+        '201':
+          description: Team member registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RegistrationResponseDto'
+        '400':
+          description: Bad request - validation failed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: Invalid or expired invitation
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 404
+                message: "Invalid invitation token"
+                error: "Not Found"
+        '409':
+          description: Email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/register/account:
+    post:
+      tags:
+        - EqualsMoney Integration
+      operationId: registerEqualsMoneyAccount
+      summary: Register a new account on Equals Money (Legacy)
+      description: |
+        DEPRECATED: Use /api/eqm/onboard-account instead.
+        Legacy endpoint for registering a new business account using the Equals Money API onboarding endpoint.
+        This creates both an EqualsMoney account and a local user account.
+      deprecated: true
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EqualsMoneyAccountRegistrationDto'
+      responses:
+        '201':
+          description: Account registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EqualsMoneyAccountRegistrationResponseDto'
+              example:
+                success: true
+                message: "Account registered successfully"
+                accountId: "acc_1234567890"
+                customerReference: "cust_ref_123"
+                status: "PENDING_VERIFICATION"
+        '400':
+          description: Bad request - invalid data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: User with email already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/eqm/accounts:
+    get:
+      tags:
+        - EqualsMoney Integration
+      operationId: getEqualsMoneyAccounts
+      summary: Get all accounts from Equals Money
+      description: |
+        Retrieve all accounts from the EqualsMoney API. This endpoint provides access to account information
+        for integration and management purposes.
+      responses:
+        '200':
+          description: Accounts retrieved successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: "Accounts retrieved successfully"
+                  accounts:
+                    type: array
+                    description: List of EqualsMoney accounts
+                    items:
+                      type: object
+                      properties:
+                        id:
+                          type: string
+                          example: "acc_1234567890"
+                        customerReference:
+                          type: string
+                          example: "cust_ref_123"
+                        status:
+                          type: string
+                          example: "ACTIVE"
+                        accountType:
+                          type: string
+                          example: "business"
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/eqm/onboard-account:
+    post:
+      tags:
+        - EqualsMoney Integration
+      operationId: onboardEqualsMoneyAccount
+      summary: Register/onboard a new account on Equals Money
+      description: |
+        Register a new business account using the Equals Money API onboarding endpoint.
+        This creates an account directly with EqualsMoney for financial services integration.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/EqualsMoneyAccountRegistrationDto'
+      responses:
+        '201':
+          description: Account registered successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/EqualsMoneyAccountRegistrationResponseDto'
+        '400':
+          description: Bad request - invalid data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '409':
+          description: Account already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /api/eqm/currencies:
+    get:
+      tags:
+        - EqualsMoney Integration
+      operationId: getSupportedCurrencies
+      summary: Get supported currencies from Equals Money (Development Mode)
+      description: |
+        DEVELOPMENT MODE - Returns static currency list without any API calls, authentication, OTP, phone, or email verification required. 
+        Completely public endpoint for testing and development purposes.
+        Optionally provide a mock account ID to get currencies with sample balances for demonstration.
+      parameters:
+        - name: accountId
+          in: query
+          required: false
+          description: Optional mock account ID to get currencies with sample balances (Development Mode)
+          schema:
+            type: string
+            example: "mock_acc_1234567890"
+      responses:
+        '200':
+          description: Static currencies retrieved successfully (No authentication required)
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrencyListResponse'
+              example:
+                success: true
+                message: "Static supported currencies retrieved (Development Mode - No Auth Required)"
+                currencies:
+                  - code: "GBP"
+                    name: "British Pound Sterling"
+                    enabled: true
+                  - code: "USD"
+                    name: "US Dollar"
+                    enabled: true
+                    balances:
+                      available: 1500.50
+                      pending: 100.00
+                  - code: "EUR"
+                    name: "Euro"
+                    enabled: true
+        '500':
+          description: Server error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/login:
+    post:
+      tags:
+        - Authentication
+      operationId: userLogin
+      summary: Login user
+      description: Authenticate a regular user and return JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDto'
+            example:
+              email: "john.doe@techsolutions.com"
+              password: "SecurePassword123!"
+              userType: "user"
+      responses:
+        '200':
+          description: Login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponseDto'
+              example:
+                access_token: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9..."
+                user:
+                  id: "550e8400-e29b-41d4-a716-446655440000"
+                  email: "john.doe@techsolutions.com"
+                  role: "admin"
+                  userType: "user"
+                  companyId: "550e8400-e29b-41d4-a716-446655440001"
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 401
+                message: "Invalid credentials"
+                error: "Unauthorized"
+
+  /auth/admin/login:
+    post:
+      tags:
+        - Authentication
+      operationId: adminLogin
+      summary: Login app admin
+      description: Authenticate an application administrator and return JWT token
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginDto'
+            example:
+              email: "admin@senda.com"
+              password: "AdminPassword123!"
+              userType: "admin"
+      responses:
+        '200':
+          description: Admin login successful
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponseDto'
+        '401':
+          description: Invalid credentials
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/verify/email/{userId}:
+    post:
+      tags:
+        - Verification
+      operationId: verifyEmail
+      summary: Verify user email with OTP
+      description: Verify a user's email address using the OTP code sent via email
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: User ID to verify
+          schema:
+            type: string
+            format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOtpDto'
+            example:
+              code: "12345"
+              type: "email_verification"
+              email: "john.doe@techsolutions.com"
+      responses:
+        '200':
+          description: Email verification result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpResponseDto'
+              example:
+                success: true
+                message: "Email verified successfully"
+        '400':
+          description: Invalid OTP code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 400
+                message: "Invalid or expired OTP code"
+                error: "Bad Request"
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/verify/phone/{userId}:
+    post:
+      tags:
+        - Verification
+      operationId: verifyPhone
+      summary: Verify user phone with OTP
+      description: Verify a user's phone number using the OTP code sent via SMS
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: User ID to verify
+          schema:
+            type: string
+            format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/VerifyOtpDto'
+            example:
+              code: "54321"
+              type: "phone_verification"
+              phone: "+447123456789"
+      responses:
+        '200':
+          description: Phone verification result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpResponseDto'
+              example:
+                success: true
+                message: "Phone verified successfully"
+        '400':
+          description: Invalid OTP code
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/resend-otp/{userId}/{type}:
+    post:
+      tags:
+        - Verification
+      operationId: resendOtp
+      summary: Resend verification OTP
+      description: Resend OTP code for email or phone verification
+      parameters:
+        - name: userId
+          in: path
+          required: true
+          description: User ID
+          schema:
+            type: string
+            format: uuid
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        - name: type
+          in: path
+          required: true
+          description: OTP type to resend
+          schema:
+            type: string
+            enum: [email, phone]
+          example: "email"
+      responses:
+        '200':
+          description: OTP resend result
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/OtpResponseDto'
+              example:
+                success: true
+                message: "OTP sent successfully"
+        '404':
+          description: User not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Too many requests - rate limited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 429
+                message: "Too many OTP requests. Please wait before requesting again."
+                error: "Too Many Requests"
+
+  /company/data:
+    get:
+      tags:
+        - Company Information
+      operationId: getCompanyData
+      summary: Get company data from Companies House (Public)
+      description: |
+        Publicly accessible endpoint to retrieve company information and director details from the UK Companies House API using the company number/business ID.
+        This endpoint fetches real-time data including company status, registered address, directors, and other official information.
+      parameters:
+        - name: business_id
+          in: query
+          required: true
+          description: Company registration number (Companies House number)
+          schema:
+            type: string
+            example: "09542738"
+      responses:
+        '200':
+          description: Company data retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyDataResponse'
+              example:
+                message: "Company details retrieved successfully"
+                success: true
+                data:
+                  company_number: "09542738"
+                  company_name: "EXAMPLE COMPANY LIMITED"
+                  company_status: "active"
+                  date_of_creation: "2015-04-15"
+                  type: "ltd"
+                  registered_office_address:
+                    address_line_1: "123 Example Street"
+                    locality: "London"
+                    postal_code: "SW1A 1AA"
+                    country: "England"
+                  sic_codes: ["70229", "62020"]
+                director:
+                  - name: "SMITH, John"
+                    officer_role: "director"
+                    appointed_on: "2015-04-15"
+                    nationality: "British"
+                    country_of_residence: "England"
+        '404':
+          description: Company not found or unable to retrieve information
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyDataResponse'
+              example:
+                message: "Unable to retrieve information. Please try again after 30 minutes"
+                data: null
+                director: []
+                success: true
+        '408':
+          description: Request timeout
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CompanyDataResponse'
+              example:
+                message: "Request timed out. Please try again later."
+                data: null
+                director: []
+                success: false
+        '422':
+          description: Validation error
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 422
+                message: "Business ID is required and must be a string"
+                error: "Unprocessable Entity"
+        '429':
+          description: Too many requests - rate limited
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /auth/profile:
+    get:
+      tags:
+        - User Profile
+      operationId: getUserProfile
+      summary: Get current user profile
+      description: Retrieve the profile information of the currently authenticated user
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile retrieved successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfileDto'
+              example:
+                id: "550e8400-e29b-41d4-a716-446655440000"
+                name: "John Doe"
+                email: "john.doe@techsolutions.com"
+                phone: "+447123456789"
+                role: "admin"
+                emailVerified: true
+                phoneVerified: true
+                isActive: true
+                company:
+                  id: "550e8400-e29b-41d4-a716-446655440001"
+                  name: "Tech Solutions Ltd"
+                  companyNumber: "REG123456789"
+                createdAt: "2024-01-01T00:00:00.000Z"
+        '401':
+          description: Unauthorized - invalid or missing token
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                statusCode: 401
+                message: "Unauthorized"
+                error: "Unauthorized"
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token obtained from login endpoint
+
+  schemas:
+    RegisterCompanyDto:
+      type: object
+      required:
+        - companyNumber
+        - companyName
+        - address
+        - directors
+        - adminFirstName
+        - adminLastName
+        - adminEmail
+        - adminPhone
+        - adminPassword
+      properties:
+        companyNumber:
+          type: string
+          description: Company registration number
+          example: "REG123456789"
+        companyName:
+          type: string
+          description: Company name
+          example: "Tech Solutions Ltd"
+        address:
+          type: string
+          description: Company address
+          example: "123 Business Street, London, UK"
+        directors:
+          type: array
+          items:
+            type: string
+          description: List of company directors
+          example: ["John Doe", "Jane Smith"]
+        adminFirstName:
+          type: string
+          description: CEO/Admin first name
+          example: "John"
+        adminLastName:
+          type: string
+          description: CEO/Admin last name
+          example: "Doe"
+        adminEmail:
+          type: string
+          format: email
+          description: CEO/Admin email address
+          example: "john.doe@techsolutions.com"
+        adminPhone:
+          type: string
+          description: CEO/Admin phone number (international format)
+          example: "+447123456789"
+        adminPassword:
+          type: string
+          minLength: 8
+          description: CEO/Admin password (minimum 8 characters)
+          example: "SecurePassword123!"
+
+    RegisterTeamMemberDto:
+      type: object
+      required:
+        - name
+        - email
+        - phone
+        - password
+        - invitationToken
+      properties:
+        name:
+          type: string
+          description: Team member name
+          example: "Jane Smith"
+        email:
+          type: string
+          format: email
+          description: Team member email address
+          example: "jane.smith@techsolutions.com"
+        phone:
+          type: string
+          description: Team member phone number (international format)
+          example: "+447123456790"
+        password:
+          type: string
+          minLength: 8
+          description: Team member password (minimum 8 characters)
+          example: "SecurePassword123!"
+        invitationToken:
+          type: string
+          description: Invitation token received via email
+          example: "inv_550e8400-e29b-41d4-a716-446655440000"
+
+    LoginDto:
+      type: object
+      required:
+        - email
+        - password
+      properties:
+        email:
+          type: string
+          format: email
+          description: Email address
+          example: "john.doe@techsolutions.com"
+        password:
+          type: string
+          description: Password
+          example: "SecurePassword123!"
+        userType:
+          type: string
+          enum: [user, admin]
+          default: user
+          description: User type (user or admin)
+          example: "user"
+
+    VerifyOtpDto:
+      type: object
+      required:
+        - code
+        - type
+      properties:
+        code:
+          type: string
+          minLength: 5
+          maxLength: 5
+          pattern: '^[0-9]{5}$'
+          description: 5-digit OTP code
+          example: "12345"
+        type:
+          type: string
+          enum: [email_verification, phone_verification, password_reset]
+          description: Type of OTP verification
+          example: "email_verification"
+        email:
+          type: string
+          format: email
+          description: Email address (required for email verification)
+          example: "john.doe@techsolutions.com"
+        phone:
+          type: string
+          description: Phone number (required for phone verification)
+          example: "+447123456789"
+
+    RegistrationResponseDto:
+      type: object
+      required:
+        - success
+        - message
+        - userId
+        - companyId
+      properties:
+        success:
+          type: boolean
+          description: Registration success status
+          example: true
+        message:
+          type: string
+          description: Human-readable response message
+          example: "Company registered successfully. Please verify your email and phone."
+        userId:
+          type: string
+          format: uuid
+          description: Created user ID for verification
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        companyId:
+          type: string
+          format: uuid
+          description: Created company ID
+          example: "550e8400-e29b-41d4-a716-446655440001"
+
+    AuthResponseDto:
+      type: object
+      required:
+        - access_token
+        - user
+      properties:
+        access_token:
+          type: string
+          description: JWT access token for authentication
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI1NTBlODQwMC1lMjliLTQxZDQtYTcxNi00NDY2NTU0NDAwMDAiLCJlbWFpbCI6ImpvaG4uZG9lQHRlY2hzb2x1dGlvbnMuY29tIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c"
+        user:
+          type: object
+          description: User information
+          properties:
+            id:
+              type: string
+              format: uuid
+              example: "550e8400-e29b-41d4-a716-446655440000"
+            email:
+              type: string
+              format: email
+              example: "john.doe@techsolutions.com"
+            role:
+              type: string
+              enum: [admin, member]
+              example: "admin"
+            userType:
+              type: string
+              enum: [user, admin]
+              example: "user"
+            companyId:
+              type: string
+              format: uuid
+              example: "550e8400-e29b-41d4-a716-446655440001"
+
+    OtpResponseDto:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          description: Operation success status
+          example: true
+        message:
+          type: string
+          description: Human-readable response message
+          example: "OTP sent successfully"
+
+    UserProfileDto:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: User ID
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        name:
+          type: string
+          description: User full name
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          description: User email address
+          example: "john.doe@techsolutions.com"
+        phone:
+          type: string
+          description: User phone number
+          example: "+447123456789"
+        role:
+          type: string
+          enum: [admin, member]
+          description: User role within the company
+          example: "admin"
+        emailVerified:
+          type: boolean
+          description: Whether email is verified
+          example: true
+        phoneVerified:
+          type: boolean
+          description: Whether phone is verified
+          example: true
+        isActive:
+          type: boolean
+          description: Whether user account is active
+          example: true
+        company:
+          type: object
+          description: Company information
+          properties:
+            id:
+              type: string
+              format: uuid
+              example: "550e8400-e29b-41d4-a716-446655440001"
+            name:
+              type: string
+              example: "Tech Solutions Ltd"
+            companyNumber:
+              type: string
+              example: "REG123456789"
+        createdAt:
+          type: string
+          format: date-time
+          description: Account creation timestamp
+          example: "2024-01-01T00:00:00.000Z"
+
+    EqualsMoneyAccountRegistrationDto:
+      type: object
+      required:
+        - market
+        - features
+        - accountType
+        - contact
+        - account
+        - kyc
+      properties:
+        market:
+          type: string
+          enum: [UK, EU]
+          description: Market for the account
+          example: "UK"
+        features:
+          type: array
+          items:
+            type: string
+          description: Features required for the account
+          example: ["payments"]
+        accountType:
+          type: string
+          enum: [Business, Personal]
+          description: Type of account (must be capitalized)
+          example: "Business"
+        contact:
+          $ref: '#/components/schemas/ContactInformationDto'
+        account:
+          $ref: '#/components/schemas/BusinessAccountDto'
+        kyc:
+          $ref: '#/components/schemas/KycInformationDto'
+
+    ContactInformationDto:
+      type: object
+      required:
+        - name
+        - email
+        - phone
+        - dob
+        - address
+      properties:
+        name:
+          type: string
+          description: "Full name (will be split into first and last name)"
+          example: "John Doe"
+        email:
+          type: string
+          format: email
+          example: "john.doe@example.com"
+        phone:
+          type: string
+          example: "+447123456789"
+        dob:
+          type: string
+          description: Date of birth (DD/MM/YYYY)
+          example: "19/01/1946"
+        address:
+          $ref: '#/components/schemas/AddressDto'
+
+    BusinessAccountDto:
+      type: object
+      required:
+        - companyName
+        - companyNumber
+        - incorporationDate
+        - type
+        - address
+      properties:
+        companyName:
+          type: string
+          example: "ACME International"
+        companyNumber:
+          type: string
+          example: "1111111111"
+        incorporationDate:
+          type: string
+          format: date
+          example: "1980-01-30"
+        type:
+          type: string
+          enum: [llc, llp, plc, ltd]
+          example: "ltd"
+        website:
+          type: string
+          format: uri
+          example: "https://www.example.com"
+        onboardingDetail:
+          type: string
+          example: "Additional business details"
+        address:
+          $ref: '#/components/schemas/AddressDto'
+
+    KycInformationDto:
+      type: object
+      required:
+        - mainPurpose
+        - sourceOfFunds
+        - destinationOfFunds
+        - currenciesRequired
+        - annualVolume
+        - numberOfPayments
+      properties:
+        mainPurpose:
+          type: array
+          items:
+            type: string
+          example: ["Investment"]
+        sourceOfFunds:
+          type: array
+          items:
+            type: string
+          example: ["salary"]
+        destinationOfFunds:
+          type: array
+          items:
+            type: string
+          example: ["GB"]
+        currenciesRequired:
+          type: array
+          items:
+            type: string
+          example: ["GBP"]
+        annualVolume:
+          type: string
+          example: "Less than £10,000"
+        numberOfPayments:
+          type: string
+          example: "More than 20 payments"
+
+    AddressDto:
+      type: object
+      required:
+        - addressLine1
+        - townCity
+        - postCode
+        - countryCode
+      properties:
+        addressLine1:
+          type: string
+          example: "Great Building"
+        addressLine2:
+          type: string
+          example: "Greater Building"
+        townCity:
+          type: string
+          example: "London"
+        postCode:
+          type: string
+          example: "SE13UB"
+        countryCode:
+          type: string
+          example: "GB"
+
+    EqualsMoneyAccountRegistrationResponseDto:
+      type: object
+      required:
+        - success
+        - message
+      properties:
+        success:
+          type: boolean
+          description: Registration success status
+          example: true
+        message:
+          type: string
+          description: Response message
+          example: "Account registered successfully"
+        accountId:
+          type: string
+          description: EqualsMoney account ID
+          example: "acc_1234567890"
+        customerReference:
+          type: string
+          description: Customer reference
+          example: "cust_ref_123"
+        status:
+          type: string
+          description: Account status
+          example: "PENDING_VERIFICATION"
+
+    CurrencyListResponse:
+      type: object
+      required:
+        - success
+        - message
+        - currencies
+      properties:
+        success:
+          type: boolean
+          description: Operation success status
+          example: true
+        message:
+          type: string
+          description: Response message
+          example: "Static supported currencies retrieved (Development Mode - No Auth Required)"
+        currencies:
+          type: array
+          description: List of supported currencies
+          items:
+            $ref: '#/components/schemas/CurrencyInfo'
+
+    CurrencyInfo:
+      type: object
+      required:
+        - code
+        - name
+        - enabled
+      properties:
+        code:
+          type: string
+          description: ISO 4217 currency code
+          example: "GBP"
+        name:
+          type: string
+          description: Currency full name
+          example: "British Pound Sterling"
+        enabled:
+          type: boolean
+          description: Whether currency is enabled/available
+          example: true
+        balances:
+          type: object
+          description: Mock account balances (only present when querying with mock account ID in Development Mode)
+          properties:
+            available:
+              type: number
+              description: Available balance (mock data)
+              example: 1500.50
+            pending:
+              type: number
+              description: Pending balance (mock data)
+              example: 100.00
+
+    CompanyDataResponse:
+      type: object
+      required:
+        - message
+        - success
+        - director
+      properties:
+        message:
+          type: string
+          description: Response message
+          example: "Company details retrieved successfully"
+        success:
+          type: boolean
+          description: Operation success status
+          example: true
+        data:
+          oneOf:
+            - $ref: '#/components/schemas/CompanyHouseData'
+            - type: 'null'
+          description: Company information from Companies House (null if not found)
+        director:
+          type: array
+          description: List of company directors/officers
+          items:
+            $ref: '#/components/schemas/CompanyHouseDirector'
+
+    CompanyHouseData:
+      type: object
+      properties:
+        company_number:
+          type: string
+          description: Company registration number
+          example: "09542738"
+        company_name:
+          type: string
+          description: Company name
+          example: "EXAMPLE COMPANY LIMITED"
+        company_status:
+          type: string
+          description: Current company status
+          example: "active"
+        company_status_detail:
+          type: string
+          description: Detailed company status
+          example: ""
+        date_of_creation:
+          type: string
+          format: date
+          description: Date when company was incorporated
+          example: "2015-04-15"
+        type:
+          type: string
+          description: Company type
+          example: "ltd"
+        registered_office_address:
+          type: object
+          description: Company registered office address
+          properties:
+            address_line_1:
+              type: string
+              example: "123 Example Street"
+            address_line_2:
+              type: string
+              example: "Suite 456"
+            locality:
+              type: string
+              example: "London"
+            region:
+              type: string
+              example: "Greater London"
+            postal_code:
+              type: string
+              example: "SW1A 1AA"
+            country:
+              type: string
+              example: "England"
+        accounts:
+          type: object
+          description: Company accounts information
+          properties:
+            next_accounts:
+              type: object
+              properties:
+                due_on:
+                  type: string
+                  format: date
+                  example: "2025-04-30"
+                period_end_on:
+                  type: string
+                  format: date
+                  example: "2024-04-30"
+                period_start_on:
+                  type: string
+                  format: date
+                  example: "2023-05-01"
+            last_accounts:
+              type: object
+              properties:
+                made_up_to:
+                  type: string
+                  format: date
+                  example: "2023-04-30"
+                type:
+                  type: string
+                  example: "full"
+        sic_codes:
+          type: array
+          items:
+            type: string
+          description: Standard Industrial Classification codes
+          example: ["70229", "62020"]
+        has_been_liquidated:
+          type: boolean
+          description: Whether company has been liquidated
+          example: false
+        has_charges:
+          type: boolean
+          description: Whether company has charges
+          example: false
+        has_insolvency_history:
+          type: boolean
+          description: Whether company has insolvency history
+          example: false
+        description:
+          type: string
+          description: Company description
+          example: "PRIVATE LIMITED COMPANY"
+
+    CompanyHouseDirector:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Director full name
+          example: "SMITH, John"
+        officer_role:
+          type: string
+          description: Role within the company
+          example: "director"
+        appointed_on:
+          type: string
+          format: date
+          description: Date appointed as officer
+          example: "2015-04-15"
+        resigned_on:
+          type: string
+          format: date
+          description: Date resigned from position (if applicable)
+          example: "2020-12-31"
+        date_of_birth:
+          type: object
+          description: Date of birth information
+          properties:
+            month:
+              type: integer
+              example: 3
+            year:
+              type: integer
+              example: 1980
+        nationality:
+          type: string
+          description: Director nationality
+          example: "British"
+        country_of_residence:
+          type: string
+          description: Country of residence
+          example: "England"
+        occupation:
+          type: string
+          description: Director occupation
+          example: "Company Director"
+
+    ErrorResponse:
+      type: object
+      required:
+        - statusCode
+        - message
+        - error
+      properties:
+        statusCode:
+          type: integer
+          description: HTTP status code
+          example: 400
+        message:
+          oneOf:
+            - type: string
+            - type: array
+              items:
+                type: string
+          description: Error message(s)
+          example: "Validation failed"
+        error:
+          type: string
+          description: Error type
+          example: "Bad Request"
+        timestamp:
+          type: string
+          format: date-time
+          description: Error timestamp
+          example: "2024-01-01T00:00:00.000Z"
+        path:
+          type: string
+          description: Request path
+          example: "/auth/register/company"
